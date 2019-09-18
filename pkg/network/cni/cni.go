@@ -158,20 +158,25 @@ func (plugin *cniNetworkPlugin) initialize() (err error) {
 	if err = ipt.AppendUnique(
 		"filter",
 		"FORWARD",
-		"-o", igniteBridgeDeviceName, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"); err != nil {
+		"-o", igniteBridgeDeviceName, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT",
+		"-m", "comment", "--comment", utils.FormatComment(igniteBridgeName, "conntrack"),
+	); err != nil {
 		return
 	}
 	if err = ipt.AppendUnique(
 		"filter",
 		"FORWARD",
-		"-i", igniteBridgeDeviceName, "-o", igniteBridgeDeviceName, "-j", "ACCEPT"); err != nil {
+		"-i", igniteBridgeDeviceName, "-o", igniteBridgeDeviceName, "-j", "ACCEPT",
+		"-m", "comment", "--comment", utils.FormatComment(igniteBridgeName, "allow-traffic"),
+	); err != nil {
 		return
 	}
-	// Forward rule to allow name resolution
 	if err = ipt.AppendUnique(
 		"filter",
 		"FORWARD",
-		"-i", igniteBridgeDeviceName, "!", "-o", igniteBridgeDeviceName, "-j", "ACCEPT"); err != nil {
+		"-i", igniteBridgeDeviceName, "!", "-o", igniteBridgeDeviceName, "-j", "ACCEPT",
+		"-m", "comment", "--comment", utils.FormatComment(igniteBridgeName, "allow-name-resolution"),
+	); err != nil {
 		return
 	}
 
