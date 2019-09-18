@@ -153,10 +153,19 @@ func (plugin *cniNetworkPlugin) initialize() (err error) {
 	if err != nil {
 		return
 	}
-	if err = ipt.AppendUnique("filter", "FORWARD", "-s", defaultCIDR, "-j", "ACCEPT"); err != nil {
+	comment := utils.FormatComment(igniteBridgeName, "")
+	if err = ipt.AppendUnique(
+		"filter",
+		"FORWARD",
+		"-s", defaultCIDR, "-j", "ACCEPT", "-m", "comment", "--comment", comment,
+	); err != nil {
 		return
 	}
-	if err = ipt.AppendUnique("filter", "FORWARD", "-d", defaultCIDR, "-j", "ACCEPT"); err != nil {
+	if err = ipt.AppendUnique(
+		"filter",
+		"FORWARD",
+		"-d", defaultCIDR, "-j", "ACCEPT", "-m", "comment", "--comment", comment,
+	); err != nil {
 		return
 	}
 
