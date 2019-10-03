@@ -23,13 +23,15 @@ const (
 func NewOCIImageRef(imageStr string) (o OCIImageRef, err error) {
 	named, err := reference.ParseDockerRef(imageStr)
 	if err != nil {
-		return
+		return o, fmt.Errorf("could not parse image %q: %s", imageStr, err)
 	}
+	o.name = named.Name()
 
 	if namedTagged, ok := named.(reference.NamedTagged); ok {
-		o.name, o.tag = namedTagged.Name(), namedTagged.Tag()
-	} else {
-		err = fmt.Errorf("could not parse image %q with a tag", imageStr)
+		o.tag = namedTagged.Tag()
+	}
+	if canonical, ok := named.(reference.Canonical); ok {
+		o.digest = canonical.Digest().String()
 	}
 
 	return
@@ -38,20 +40,32 @@ func NewOCIImageRef(imageStr string) (o OCIImageRef, err error) {
 // OCIImageRef is a struct containing a names and tagged reference
 // by which an OCI runtime can identify an image to retrieve.
 type OCIImageRef struct {
-	name string
-	tag  string
+	name   string
+	tag    string
+	digest string
 }
 
 var _ fmt.Stringer = OCIImageRef{}
 
-// Ref parses the internal strings to a reference.NamedTagged
-func (i OCIImageRef) Ref() reference.NamedTagged {
-	r, _ := reference.ParseDockerRef(fmt.Sprintf("%s:%s", i.name, i.tag))
-	return r.(reference.NamedTagged)
+// Ref parses the internal strings to a reference.Reference
+func (i OCIImageRef) Ref() (r reference.Reference) {
+	if i.name != "" {
+		if i.digest != "" {
+			r, _ = reference.ParseDockerRef(fmt.Sprintf("%s@%s", i.name, i.digest))
+		} else if i.tag != "" {
+			r, _ = reference.ParseDockerRef(fmt.Sprintf("%s:%s", i.name, i.tag))
+		} else {
+			r, _ = reference.ParseDockerRef(i.name)
+		}
+	}
+	return r
 }
 
 // String returns the familiar form of the reference, e.g. "weaveworks/ignite-ubuntu:latest"
 func (i OCIImageRef) String() string {
+	if i.Ref() == nil {
+		return ""
+	}
 	return reference.FamiliarString(i.Ref())
 }
 
