@@ -415,7 +415,7 @@ func (cc *ctdClient) RunContainer(image meta.OCIImageRef, config *runtime.Contai
 	opts := []oci.SpecOpts{
 		oci.WithDefaultSpec(),
 		oci.WithDefaultUnixDevices,
-		oci.WithTTY,
+		// oci.WithTTY,
 		oci.WithImageConfigArgs(img, config.Cmd),
 		withAddedCaps(config.CapAdds),
 		withHostname(config.Hostname),
@@ -470,8 +470,15 @@ func (cc *ctdClient) RunContainer(image meta.OCIImageRef, config *runtime.Contai
 
 	// Spawn the Creator with the dummy streams
 	ioCreator := cio.NewCreator(cio.WithTerminal, cio.WithStreams(dummyReader, con, con))
+	ioCreator = cio.NewCreator(cio.WithStdio)
 
 	task, err := cont.NewTask(cc.ctx, ioCreator)
+	if err != nil {
+		return
+	}
+
+	// make sure we wait before calling start
+	_, err = task.Wait(cc.ctx)
 	if err != nil {
 		return
 	}
