@@ -1,6 +1,8 @@
 package cleanup
 
 import (
+	"os"
+
 	api "github.com/weaveworks/ignite/pkg/apis/ignite"
 	"github.com/weaveworks/ignite/pkg/util"
 )
@@ -9,7 +11,7 @@ import (
 func DeactivateSnapshot(vm *api.VM) error {
 	dmArgs := []string{
 		"remove",
-		vm.SnapshotDev(),
+		util.NewPrefixer().Prefix(vm.GetUID()),
 	}
 
 	// If the base device is visible in "dmsetup", we should remove it
@@ -21,5 +23,17 @@ func DeactivateSnapshot(vm *api.VM) error {
 	}
 
 	_, err := util.ExecuteCommand("dmsetup", dmArgs...)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// VM's from previous versions of ignite may not have a snapshot-dev symlink
+	// Lstat it first before attempting to remove it
+	if _, err = os.Lstat(vm.SnapshotDevLink()); err == nil {
+		if err = os.Remove(vm.SnapshotDevLink()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

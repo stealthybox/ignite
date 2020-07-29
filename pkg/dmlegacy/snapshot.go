@@ -17,13 +17,15 @@ import (
 
 const snapshotLockFileName = "ignite-snapshot.lock"
 
-// ActivateSnapshot sets up the snapshot with devicemapper so that it is active and can be used
-func ActivateSnapshot(vm *api.VM) (err error) {
+// ActivateSnapshot sets up the snapshot with devicemapper so that it is active and can be used.
+// A symlink for the device is created in the VM ObjectPath data directory.
+// It returns the non-symlinked path of the bootable snapshot device.
+func ActivateSnapshot(vm *api.VM) (devPath string, err error) {
 	device := util.NewPrefixer().Prefix(vm.GetUID())
-	devicePath := vm.SnapshotDev()
+	deviceSymlink := vm.SnapshotDevLink()
 
 	// Return if the snapshot is already setup
-	if util.FileExists(devicePath) {
+	if util.FileExists(deviceSymlink) {
 		return
 	}
 
@@ -47,7 +49,8 @@ func ActivateSnapshot(vm *api.VM) (err error) {
 	// Create a lockfile and obtain a lock.
 	lock, err := lockfile.New(glpath)
 	if err != nil {
-		return fmt.Errorf("failed to create lock: %v", err)
+		err = fmt.Errorf("failed to create lockfile: %w", err)
+		return
 	}
 	if err = obtainLock(lock); err != nil {
 		return
@@ -99,23 +102,35 @@ func ActivateSnapshot(vm *api.VM) (err error) {
 			return
 		}
 
-		basePath = fmt.Sprintf("/dev/mapper/%s", baseDevice)
+		if basePath, err = GetBlkDevPath(baseDevice); err != nil {
+			return
+		}
 	}
 
-	// "0 8388608 snapshot /dev/{loop0,mapper/ignite-<uid>-base} /dev/loop1 P 8"
+	// "0 8388608 snapshot /dev/{loop0,dm-1,mapper/ignite-<uid>-base} /dev/loop1 P 8"
 	dmTable := []byte(fmt.Sprintf("0 %d snapshot %s %s P 8", overlayLoopSize, basePath, overlayLoop.Path()))
 
+	// setup the main boot device
 	if err = runDMSetup(device, dmTable); err != nil {
+		return
+	}
+
+	// get the boot device's actual path and create a well named symlink in the VM object dir
+	devPath, err = GetBlkDevPath(device)
+	if err != nil {
+		return
+	}
+	if err = os.Symlink(devPath, deviceSymlink); err != nil {
 		return
 	}
 
 	// Repair the filesystem in case it has errors
 	// e2fsck throws an error if the filesystem gets repaired, so just ignore it
-	_, _ = util.ExecuteCommand("e2fsck", "-p", "-f", devicePath)
+	_, _ = util.ExecuteCommand("e2fsck", "-p", "-f", deviceSymlink)
 
 	// If the overlay is larger than the image, call resize2fs to make the filesystem fill the overlay
 	if overlayLoopSize > imageLoopSize {
-		if _, err = util.ExecuteCommand("resize2fs", devicePath); err != nil {
+		if _, err = util.ExecuteCommand("resize2fs", deviceSymlink); err != nil {
 			return
 		}
 	}

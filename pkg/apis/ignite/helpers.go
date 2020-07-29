@@ -4,7 +4,6 @@ import (
 	"path"
 
 	"github.com/weaveworks/ignite/pkg/constants"
-	"github.com/weaveworks/ignite/pkg/util"
 )
 
 // SetImage populates relevant fields to an Image on the VM object
@@ -19,9 +18,9 @@ func (vm *VM) SetKernel(kernel *Kernel) {
 	vm.Status.Kernel = kernel.Status.OCISource
 }
 
-// SnapshotDev returns the path where the (legacy) DM snapshot exists
-func (vm *VM) SnapshotDev() string {
-	return path.Join("/dev/mapper", util.NewPrefixer().Prefix(vm.GetUID()))
+// SnapshotDevLink returns the symlink to where the (legacy) DM snapshot exists
+func (vm *VM) SnapshotDevLink() string {
+	return path.Join(vm.ObjectPath(), "snapshot-dev")
 }
 
 // Running returns true if the VM is running, otherwise false

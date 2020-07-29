@@ -48,8 +48,8 @@ func CleanupVM(vm *api.VM) error {
 	// TODO should this function return a proper error?
 	RemoveVMContainer(inspectResult)
 
-	// After remove the VM container, and the SnapshotDev still there
-	if _, err := os.Stat(vm.SnapshotDev()); err == nil {
+	// After remove the VM container, and the linked Snapshot Device is still there
+	if _, err := os.Stat(vm.SnapshotDevLink()); err == nil {
 		// try remove it again with DeactivateSnapshot
 		if err := cleanup.DeactivateSnapshot(vm); err != nil {
 			return err
